@@ -1,6 +1,5 @@
 import logging
 import os
-import pprint
 import time
 
 from dotenv import load_dotenv
@@ -28,7 +27,7 @@ def download_vacancies_hh(language):
     url = 'https://api.hh.ru/vacancies/'
     headers = {'User-Agent': 'HH-User-Agent'}
     params = {
-        'area': HH_MOSCOW_AREA, 
+        'area': HH_MOSCOW_AREA,
         'period': PERIOD_IN_DAYS,
         'search_field': 'name'
     }
@@ -129,9 +128,11 @@ def predict_rub_salary_hh(vacancy):
     полученной с сайта hh.ru.
     """
 
-    if (not vacancy or
-        not vacancy['salary'] or
-        vacancy['salary']['currency'] != 'RUR'):
+    if (
+            not vacancy or
+            not vacancy['salary'] or
+            vacancy['salary']['currency'] != 'RUR'
+       ):
         return None
     return predict_salary(vacancy['salary']['from'], vacancy['salary']['to'])
 
@@ -142,7 +143,7 @@ def predict_rub_salary_sj(vacancy):
     полученной с сайта superjob.ru.
     """
 
-    if (not vacancy or vacancy['currency'] != 'rub'):
+    if not vacancy or (vacancy['currency'] != 'rub'):
         return None
     return predict_salary(vacancy['payment_from'], vacancy['payment_to'])
 
