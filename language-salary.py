@@ -8,8 +8,6 @@ from terminaltables import AsciiTable
 
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-logging.basicConfig(filename='language-salary.log', filemode='w')
 
 
 HH_MOSCOW_AREA = 1
@@ -47,9 +45,9 @@ def download_vacancies_hh(language):
                 logger.info(f'Запрос "{search_text}" c {url} - страница {page}')
                 page_response = requests.get(url, headers=headers, params=params)
                 page_response.raise_for_status()
-                page_json = page_response.json()
-                vacancies.extend(page_json['items'])
-                number_of_pages = page_json['pages']
+                page_dict = page_response.json()
+                vacancies.extend(page_dict['items'])
+                number_of_pages = page_dict['pages']
             except requests.HTTPError:
                 logger.warning(
                     f'При загрузке страницы {page} запроса "{search_text}" '
@@ -94,9 +92,9 @@ def download_vacancies_sj(language, secret_key):
                 logger.info(f'Запрос "Программист {language}" c {url} - страница {page}')
                 page_response = requests.get(url, headers=headers, params=params)
                 page_response.raise_for_status()
-                page_json = page_response.json()
-                vacancies.extend(page_json['objects'])
-                more_pages = page_json['more']
+                page_dict = page_response.json()
+                vacancies.extend(page_dict['objects'])
+                more_pages = page_dict['more']
             except requests.HTTPError:
                 logger.warning(
                     f'При загрузке страницы {page} запроса "Программист {language}" '
@@ -115,10 +113,10 @@ def download_vacancies_sj(language, secret_key):
 
 
 def get_statistics(language, vacancies, predict_salaries):
-    predict_salaries = [x for x in predict_salaries if x]
+    predict_salaries = [predict_salary for predict_salary in predict_salaries if predict_salary]
     vacancies_found = len(vacancies)
     vacancies_processed = len(predict_salaries)
-    average_salary = sum(predict_salaries) // len(predict_salaries)
+    average_salary = sum(predict_salaries) // len(predict_salaries) if predict_salaries else '-'
     return [language, vacancies_found, vacancies_processed, average_salary]
 
 
@@ -165,27 +163,28 @@ def predict_salary(salary_from, salary_to):
 
 
 def main():
+    logger.setLevel(logging.INFO)
+    logging.basicConfig(filename='language-salary.log', filemode='w')
+
     load_dotenv()
     sj_secret_key = os.environ['SJ_SECRET_KEY']
 
     languages = ['Python', 'C++', 'C#', 'Go', 'Java', 'JavaScript', 'PHP', 'Ruby']
     table_cap = ('Язык', 'Вакансий найдено', 'Вакансий обработано', 'Средняя зарплата')
 
-    statistics_hh = [table_cap]
+    statistics_hh, statistics_sj = [table_cap], [table_cap]
     for language in languages:
         vacancies_hh = download_vacancies_hh(language=language)
-        predict_salaries_hh = [predict_rub_salary_hh(x) for x in vacancies_hh]
+        predict_salaries_hh = [predict_rub_salary_hh(vacancy) for vacancy in vacancies_hh]
         statistics_hh.append(get_statistics(language, vacancies_hh, predict_salaries_hh))
+
+        vacancies_sj = download_vacancies_sj(language=language, secret_key=sj_secret_key)
+        predict_salaries_sj = [predict_rub_salary_sj(vacancy) for vacancy in vacancies_sj]
+        statistics_sj.append(get_statistics(language, vacancies_sj, predict_salaries_sj))
 
     table_instance_hh = AsciiTable(statistics_hh, title='HeadHunter Moscow')
     print(table_instance_hh.table)
     print()
-
-    statistics_sj = [table_cap]
-    for language in languages:
-        vacancies_sj = download_vacancies_sj(language=language, secret_key=sj_secret_key)
-        predict_salaries_sj = [predict_rub_salary_sj(x) for x in vacancies_sj]
-        statistics_sj.append(get_statistics(language, vacancies_sj, predict_salaries_sj))
 
     table_instance_sj = AsciiTable(statistics_sj, 'SuperJob Moscow')
     print(table_instance_sj.table)
