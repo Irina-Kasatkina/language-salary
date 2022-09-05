@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 
 
 HH_MOSCOW_AREA = 1
-PERIOD_IN_DAYS = 30
+HH_PERIOD_IN_DAYS = 30
+QUERY_TIMEOUT = 30
 SJ_MOSCOW_ID = 4
 SJ_IT_SECTION = 33
 
@@ -26,7 +27,7 @@ def download_vacancies_hh(language):
     headers = {'User-Agent': 'HH-User-Agent'}
     params = {
         'area': HH_MOSCOW_AREA,
-        'period': PERIOD_IN_DAYS,
+        'period': HH_PERIOD_IN_DAYS,
         'search_field': 'name'
     }
     search_text = 'Программист'
@@ -45,9 +46,9 @@ def download_vacancies_hh(language):
                 logger.info(f'Запрос "{search_text}" c {url} - страница {page}')
                 page_response = requests.get(url, headers=headers, params=params)
                 page_response.raise_for_status()
-                page_dict = page_response.json()
-                vacancies.extend(page_dict['items'])
-                number_of_pages = page_dict['pages']
+                vacancies_page = page_response.json()
+                vacancies.extend(vacancies_page['items'])
+                number_of_pages = vacancies_page['pages']
             except requests.HTTPError:
                 logger.warning(
                     f'При загрузке страницы {page} запроса "{search_text}" '
@@ -58,7 +59,7 @@ def download_vacancies_hh(language):
                     f'При загрузке страницы {page} запроса "{search_text}" '
                     f'c {url} возникла ошибка соединения с сайтом.'
                 )
-                time.sleep(30)
+                time.sleep(QUERY_TIMEOUT)
                 continue
             break
         page += 1
@@ -92,9 +93,9 @@ def download_vacancies_sj(language, secret_key):
                 logger.info(f'Запрос "Программист {language}" c {url} - страница {page}')
                 page_response = requests.get(url, headers=headers, params=params)
                 page_response.raise_for_status()
-                page_dict = page_response.json()
-                vacancies.extend(page_dict['objects'])
-                more_pages = page_dict['more']
+                vacancies_page = page_response.json()
+                vacancies.extend(vacancies_page['objects'])
+                more_pages = vacancies_page['more']
             except requests.HTTPError:
                 logger.warning(
                     f'При загрузке страницы {page} запроса "Программист {language}" '
@@ -105,7 +106,7 @@ def download_vacancies_sj(language, secret_key):
                     f'При загрузке страницы {page} запроса "Программист {language}" '
                     f'c {url} возникла ошибка соединения с сайтом.'
                 )
-                time.sleep(30)
+                time.sleep(QUERY_TIMEOUT)
                 continue
             break
         page += 1
@@ -116,7 +117,12 @@ def get_statistics(language, vacancies, predict_salaries):
     predict_salaries = [predict_salary for predict_salary in predict_salaries if predict_salary]
     vacancies_found = len(vacancies)
     vacancies_processed = len(predict_salaries)
-    average_salary = sum(predict_salaries) // len(predict_salaries) if predict_salaries else '-'
+
+    if predict_salaries:
+        average_salary = str(sum(predict_salaries) // len(predict_salaries))
+    else:
+        average_salary = '-'
+
     return [language, vacancies_found, vacancies_processed, average_salary]
 
 
